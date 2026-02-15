@@ -12,8 +12,8 @@ export default function Step1_EpicGeneration() {
     
     setLoading(true);
     try {
-      // Talking to your Python Backend (Port 8000)
-      const response = await fetch('http://localhost:8000/api/generate-epics', {
+      // Talking to your Node.js Backend (Port 8000)
+      const response = await fetch('http://localhost:8000/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ description: projectData.description }),
@@ -25,7 +25,7 @@ export default function Step1_EpicGeneration() {
       nextStep(); // Move to Step 2
     } catch (error) {
       console.error("AI Error:", error);
-      alert("Backend not found. Make sure Python main.py is running on port 8000.");
+      alert("Backend not found. Make sure the Node.js backend is running on port 8000.");
     } finally {
       setLoading(false);
     }

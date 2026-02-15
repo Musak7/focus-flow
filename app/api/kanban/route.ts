@@ -29,21 +29,28 @@ export async function GET() {
     const baseUrl = `https://${domain}`;
 
     const jql = `project=${projectKey} ORDER BY created DESC`;
-    const apiUrl = `${baseUrl}/rest/api/3/search?jql=${encodeURIComponent(jql)}&maxResults=50`;
-    
+    // NEW API: Use /rest/api/3/search/jql instead of /rest/api/3/search
+    const apiUrl = `${baseUrl}/rest/api/3/search/jql`;
+
     console.log("Target URL:", apiUrl);
+    console.log("JQL Query:", jql);
 
     // 4. Auth
     const auth = Buffer.from(`${email}:${apiToken}`).toString('base64');
 
-    // 5. Fetch
+    // 5. Fetch (POST method with JQL in body)
     const response = await fetch(apiUrl, {
-      method: 'GET',
+      method: 'POST',
       headers: {
         'Authorization': `Basic ${auth}`,
         'Accept': 'application/json',
         'Content-Type': 'application/json'
       },
+      body: JSON.stringify({
+        jql: jql,
+        maxResults: 50,
+        fields: ['summary', 'status', 'assignee', 'priority', 'created']
+      }),
       cache: 'no-store'
     });
 
@@ -59,16 +66,31 @@ export async function GET() {
     }
 
     const data = await response.json();
-    console.log(`Success! Found ${data.issues.length} issues.`);
+    console.log('🔍 Raw Jira Response:', JSON.stringify(data, null, 2));
+    console.log(`Success! Found ${data.issues?.length || 0} issues.`);
 
-    // 7. Format
-    const formattedIssues = data.issues.map((issue: any) => ({
-      id: issue.key,
-      title: issue.fields.summary,
-      status: issue.fields.status.name,
-      assignee: issue.fields.assignee ? issue.fields.assignee.displayName : "Unassigned",
-      priority: issue.fields.priority ? issue.fields.priority.name : "Medium"
-    }));
+    // 7. Format with proper status mapping
+    const formattedIssues = (data.issues || []).map((issue: any) => {
+      const jiraStatus = issue.fields.status.name;
+
+      // Map Jira status to board columns
+      let boardStatus = jiraStatus;
+      if (jiraStatus.toLowerCase().includes('to do') || jiraStatus.toLowerCase() === 'todo') {
+        boardStatus = 'To Do';
+      } else if (jiraStatus.toLowerCase().includes('in progress') || jiraStatus.toLowerCase() === 'inprogress') {
+        boardStatus = 'In Progress';
+      } else if (jiraStatus.toLowerCase() === 'done' || jiraStatus.toLowerCase() === 'completed') {
+        boardStatus = 'Done';
+      }
+
+      return {
+        id: issue.key,
+        title: issue.fields.summary,
+        status: boardStatus,
+        assignee: issue.fields.assignee ? issue.fields.assignee.displayName : "Unassigned",
+        priority: issue.fields.priority ? issue.fields.priority.name : "Medium"
+      };
+    });
 
     return NextResponse.json(formattedIssues);
 
